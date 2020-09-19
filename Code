@@ -1,0 +1,110 @@
+#include <Servo.h>
+Servo myservo1;
+Servo myservo2;
+
+#include <Wire.h>
+#include "Adafruit_SGP30.h"
+int VOC1 = 0;
+int VOC2 = 0;
+int VOC3 = 0;
+int VOC4 = 0;
+int VOC5 = 0;
+float VOCAVE;
+
+Adafruit_SGP30 sgp;
+uint32_t getAbsoluteHumidity(float temperature, float humidity) {
+  // approximation formula from Sensirion SGP30 Driver Integration chapter 3.15
+  const float absoluteHumidity = 216.7f * ((humidity / 100.0f) * 6.112f * exp((17.62f * temperature) / (243.12f + temperature)) / (273.15f + temperature)); // [g/m^3]
+  const uint32_t absoluteHumidityScaled = static_cast<uint32_t>(1000.0f * absoluteHumidity); // [mg/m^3]
+  return absoluteHumidityScaled;
+}
+
+bool onoff = 0;
+//int counter = 0;
+
+//For Muscle
+int sensorValue = 0;
+int outputValue = 0;
+
+//For Ultrasonic
+int time;
+int distance;
+int trigPin = 7;
+int echoPin = 8;
+
+void setup() {
+  myservo1.attach(9);
+  myservo2.attach(10);
+  pinMode(A3, INPUT); // Muscle
+  pinMode (trigPin, OUTPUT);
+  pinMode (echoPin, INPUT);
+  Serial.begin(9600);
+  myservo1.write(180);
+  myservo2.write(90);
+  if (! sgp.begin()) {
+    while (1);
+  }
+}
+
+void loop() {
+  //Muscle Sensor
+ *delay(50);
+    sensorValue = analogRead(A3);
+    outputValue = map(sensorValue, 0, 1023, 0, 255);
+
+    if (sensorValue > 400) {
+     if (onoff == 1) {
+       myservo1.write(180);
+       myservo2.write(90);
+       onoff = 0;
+     }
+    }
+    
+  //Ultrasonic
+    digitalWrite (trigPin, HIGH);
+    delayMicroseconds (10);
+    digitalWrite (trigPin, LOW);
+    time = pulseIn (echoPin, HIGH);
+    distance = (time * 0.034) / 2;
+
+    if (distance < 7 && distance > 4) {
+    delay(500);
+    if (distance < 7 && distance > 4) {
+      if (onoff == 0) {
+        myservo1.write(90);
+        myservo2.write(180);
+        onoff = 1;
+        } else {
+        myservo1.write(180);
+        myservo2.write(90);
+        onoff = 0;
+        delay(500);
+      }
+    }
+    }
+
+  if (! sgp.IAQmeasure()) {
+    return;
+  }
+ 
+counter++;
+
+if (counter == 5){
+  counter = 0;
+  VOC5 = VOC4;
+  VOC4 = VOC3;
+  VOC3 = VOC2;
+  VOC2 = VOC1;
+  VOC1 = sgp.TVOC;
+  VOCAVE = (VOC1 + VOC2 + VOC3 + VOC4 + VOC5) / 5;
+}
+  
+  if (VOCAVE > 50) {
+    if (onoff == 1) {
+      myservo1.write(180);
+      myservo2.write(90);
+      onoff = 1;
+    }
+  }
+  delay(500);
+}
